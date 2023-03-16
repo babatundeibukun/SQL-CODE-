@@ -1,0 +1,46 @@
+--CTE
+WITH T1 AS (
+    SELECT submission_date, hacker_id, COUNT(*) as submission_count
+FROM submissions 
+GROUP BY submission_date, hacker_id
+             ),
+ T2 AS (
+     SELECT submission_date, hacker_id, submission_count,
+       RANK() OVER (PARTITION BY submission_date ORDER BY submission_count DESC, hacker_id) AS RANKING
+FROM T1),
+ 
+ top_hacker AS (
+SELECT submission_date , hacker_id
+FROM T2
+WHERE RANKING =1),
+
+
+
+--NOW to find the hacker that made unique submisions from the previous day
+
+--Because we are going to use the rank function and DATEDIFF, it is better
+--we first find the distinct days that each hacker made submssions 
+--CTE 
+T3 as (
+SELECT DISTINCT submission_date, hacker_id
+FROM submissions),
+
+T4 AS (
+SELECT submission_date, hacker_id, 
+RANK() OVER (PARTITION BY hacker_id ORDER BY submission_date) AS rank_hacker_day,
+DATEDIFF(day, (SELECT MIN(submission_date) FROM submissions), submission_date) +1 AS date_from_start
+FROM T3),
+
+the_unique_hackers AS (
+SELECT submission_date, COUNT(hacker_id) AS unique_hackers
+FROM T4
+WHERE rank_hacker_day= date_from_start
+GROUP BY submission_date)
+
+
+SELECT a.submission_date, t.unique_hackers , a.hacker_id, h.name 
+FROM top_hacker a 
+LEFT JOIN hackers h
+ON h.hacker_id=a.hacker_id
+LEFT JOIN the_unique_hackers t
+ON t.submission_date = a.submission_date
